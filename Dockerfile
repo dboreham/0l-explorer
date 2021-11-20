@@ -10,4 +10,6 @@ RUN yarn
 
 RUN yarn next build
 
+EXPOSE 1010
+
 CMD [ "node", "index.js" ]
