@@ -15,24 +15,8 @@ import {
 } from '../../lib/types/0l'
 import { get } from 'lodash'
 import TransactionsTable from '../../components/transactionsTable/transactionsTable'
-
-const timeDifference = (current, previous) => {
-  const msPerMinute = 60 * 1000
-  const msPerHour = msPerMinute * 60
-  const msPerDay = msPerHour * 24
-  const msPerMonth = msPerDay * 30
-  const msPerYear = msPerDay * 365
-  const elapsed = current - previous
-
-  if (elapsed < msPerMinute) return Math.round(elapsed / 1000) + ' seconds ago'
-  if (elapsed < msPerHour)
-    return Math.round(elapsed / msPerMinute) + ' minutes ago'
-  if (elapsed < msPerDay) return Math.round(elapsed / msPerHour) + ' hours ago'
-  if (elapsed < msPerMonth) return Math.round(elapsed / msPerDay) + ' days ago'
-  if (elapsed < msPerYear)
-    return Math.round(elapsed / msPerMonth) + ' months ago'
-  return Math.round(elapsed / msPerYear) + ' years ago'
-}
+import { numberWithCommas } from '../../lib/utils'
+import NotFoundPage from '../404'
 
 const fallbackCopyTextToClipboard = (text) => {
   var textArea = document.createElement('textarea')
@@ -84,6 +68,8 @@ const AddressPage = ({
   transactions: TransactionMin[]
   errors: NodeRPCError[]
 }) => {
+  if (!account) return NotFoundPage()
+
   useEffect(() => {
     if (errors.length > 0) {
       console.error(errors)
@@ -93,7 +79,7 @@ const AddressPage = ({
     }
   }, [])
 
-  const balance = get(account, 'balances[0].amount') || 0
+  const balance = (get(account, 'balances[0].amount') || 0) / 1000000
   return (
     <NavLayout>
       <TransactionsTable
@@ -103,14 +89,16 @@ const AddressPage = ({
             <h1
               className={classes.address}
               onClick={copyTextToClipboard.bind(this, account.address)}>
-              Address{' '}
+              Address:{' '}
               <span className={classes.addressText}>{account.address}</span>
             </h1>
             <h3
               className={classes.balance}
-              onClick={copyTextToClipboard.bind(this, `${balance}`)}>
+              onClick={copyTextToClipboard.bind(this, balance)}>
               Balance:{' '}
-              <span className={classes.balanceText}>{balance / 1000000}</span>
+              <span className={classes.balanceText}>
+                {numberWithCommas(balance)}
+              </span>
             </h3>
           </div>
         }
@@ -134,7 +122,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     getAccountTransactions({
       account: addressSingle,
       start: 0,
-      limit: 200,
+      limit: 1000,
       includeEvents: false,
     }),
   ])
@@ -143,7 +131,12 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   if (accountsRes.error) errors.push(accountsRes.error)
   if (transactionsRes.error) errors.push(transactionsRes.error)
 
-  const account: Account = accountsStatus === 200 ? accountsRes.result : null
+  if (errors.length > 0) {
+    console.log({errors})
+    ctx.res.statusCode = 404
+  }
+
+  const account: Account = accountsRes.result || null
   const transactions: TransactionMin[] =
     transactionsStatus === 200 && !transactionsRes.error
       ? transactionsRes.result
