@@ -2,13 +2,14 @@ version: '3'
 services:
   0l:
     build: .
-    command: yarn nodemon server.js
+    command: yarn nodemon --watch routers/ --watch lib/**/*.js --watch index.js index.js
     environment:
       - PORT=3027
       - NEXT_TELEMETRY_DISABLED=1
       - NODE_ENV=development
       - NODE_HOSTNAME=35.231.138.89
-      #- NODE_HOSTNAME=138.197.59.9
+      - PERMISSION_TREE_API_URL=https://0l.interblockcha.in:444
+      - GA_MEASUREMENT_ID=G-Z8SZTHYB62
     ports:
       - "3027:3027"
     volumes:
@@ -17,7 +18,9 @@ services:
       - ./styles:/code/styles
       - ./pages:/code/pages
       - ./public:/code/public
+      - ./routers:/code/routers
       - ./index.js:/code/index.js
       - ./next-env.d.ts:/code/next-env.d.ts
       - ./tsconfig.json:/code/tsconfig.json
+      - ./next.config.js:/code/next.config.js
       - ./package.json:/code/package.json

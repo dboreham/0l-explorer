@@ -47,3 +47,17 @@
 .thinText {
   font-weight: 200;
 }
+
+.topStats {
+  justify-content: center;
+  display: flex;
+}
+
+.topStatsInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #003f34;
+  padding: 16px;
+  border-radius: 4px;
+}
