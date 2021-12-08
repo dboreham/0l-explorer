@@ -9,6 +9,17 @@ export interface Amount {
 export interface Account {
   address: string
   balances: Amount[]
+  sequence_number: number
+  authentication_key: string
+  sent_events_key: string
+  received_events_key: string
+  delegated_key_rotation_capability: boolean
+  delegated_withdrawal_capability: boolean
+  is_frozen: boolean
+  role: {
+    type: string
+  }
+  version: number
 }
 
 export interface NodeRPCError {
@@ -28,23 +39,12 @@ export interface NodeRPCResponse {
 
 export interface AccountResponse extends NodeRPCResponse {
   result: Account
-  sequence_number: number
-  authentication_key: string
-  sent_events_key: string
-  received_events_key: string
-  delegated_key_rotation_capability: boolean
-  delegated_withdrawal_capability: boolean
-  is_frozen: boolean
-  role: {
-    type: string
-  }
-  version: number
 }
 
 export interface Script {
   type: string
   code: string
-  arguments: string[]
+  arguments_bcs: string[]
   type_arguments: string[]
 }
 
@@ -94,6 +94,9 @@ export interface PeerToPeerWithMetadata extends Script {
 export interface EventData {
   type: string
   amount: Amount
+  sender?: string
+  receiver?: string
+  metadata?: string
   preburn_address?: string
 }
 
@@ -102,6 +105,10 @@ export interface Event {
   sequence_number: number
   transaction_version: number
   data: EventData
+}
+
+export interface EventsResponse extends NodeRPCResponse {
+  result: Event[]
 }
 
 export interface VMStatus {
@@ -223,6 +230,9 @@ export const getTransactionMin = (tx: Transaction): TransactionMin => {
   const script_function = get(tx, 'transaction.script.function_name')
   const status = get(tx, 'vm_status.type')
 
+  const expiration = get(tx, 'transaction.expiration_timestamp_secs')
+  const timestamp = expiration ? (expiration - 4999) * 1000000 : undefined
+
   const { version, hash } = tx
   const sender = get(tx, 'transaction.sender') || null
   if (script_function === 'create_user_by_coin_tx') {
@@ -233,6 +243,7 @@ export const getTransactionMin = (tx: Transaction): TransactionMin => {
         recipient: onboard_address,
         status,
         sender,
+        timestamp,
         version,
         hash,
       }
@@ -246,17 +257,16 @@ export const getTransactionMin = (tx: Transaction): TransactionMin => {
       status,
       sender,
       version,
+      timestamp,
       hash,
     }
   }
   let type: string = tx.transaction.type
   if (type === 'blockmetadata') {
     type = 'Block Metadata'
-    const timestamp = (tx.transaction as BlockMetadataTransaction)
-      .timestamp_usecs
     return {
       type,
-      timestamp,
+      timestamp: (tx.transaction as BlockMetadataTransaction).timestamp_usecs,
       hash,
       sender,
       version,
@@ -268,6 +278,7 @@ export const getTransactionMin = (tx: Transaction): TransactionMin => {
     hash,
     sender,
     version,
+    timestamp,
     status,
   }
 }
@@ -373,4 +384,49 @@ export interface Vitals {
     }
     validator_view: ValidatorInfo[]
   }
+}
+
+export interface StatsResponse {
+  allAccountCount: number // All accounts
+  allMinerCount: number // All accounts with tower height > 0
+  activeMinerCount: number // All accounts that have submitted proofs in current epoch
+}
+
+export interface PermissionNodeValidator {
+  address: string // Address of this validator
+  parent: string // Address of validator that onboarded this validator
+  version_onboarded: number // Height when validator was onboarded
+}
+
+export interface ValidatorPermissionTreeResponse
+  extends PermissionNodeValidator {
+  children: PermissionNodeValidator[]
+}
+
+export interface PermissionNodeMiner {
+  address: string // Address of this validator
+  parent: string // Address of validator that onboarded this validator
+  version_onboarded: number // Height when validator was onboarded
+  has_tower: boolean // Does miner have tower height > 0 ?
+  is_active: boolean // Has miner submitted proofs in current epoch?
+}
+
+export interface MinerPermissionTreeResponse extends PermissionNodeMiner {
+  children: PermissionNodeMiner[]
+}
+
+export interface MinerEpochStatsResponse {
+  epoch: number
+  count: number
+}
+
+export interface EpochProofsResponse {
+  epoch: number
+  miners: number // Total accounts submitting proofs in epoch (miners and validators)
+  proofs: number // Total number of miner proofs in epoch for all miners
+  validator_proofs: number // How many of the proofs were by validators
+  miner_proofs: number // How many of the proofs were by miners
+  miners_payable: number // Number of miners that are above payment threshold
+  miners_payable_proofs: number // Total number of proofs submitted by miners that are above the payment threshold
+  miner_payment_total: number // Total 0L distributed amonst miners
 }
